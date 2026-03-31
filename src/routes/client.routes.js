@@ -1,28 +1,13 @@
 import { Router } from 'express';
-import jwt from 'jsonwebtoken';
 import Client from '../models/Client.js';
+import { protect } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-// Middleware to verify JWT
-const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) return res.status(401).json({ error: 'Access denied' });
-
-    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
-    jwt.verify(token, jwtSecret, (err, user) => {
-        if (err) return res.status(403).json({ error: 'Invalid token' });
-        req.user = user;
-        next();
-    });
-};
-
 // Get current user's Client config and usage stats
-router.get('/me', authenticateToken, async (req, res) => {
+router.get('/me', protect, async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user._id;
         let client = await Client.findOne({ userId });
 
         if (!client) {
@@ -37,9 +22,9 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // Update current user's Client config
-router.put('/me', authenticateToken, async (req, res) => {
+router.put('/me', protect, async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user._id;
         const updates = req.body;
 
         // Prevent updating sensitive fields
