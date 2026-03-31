@@ -145,7 +145,7 @@ router.post('/', async (req, res) => {
                 query,
                 business_id: businessId,
                 bot_settings: botConfig
-            });
+            }, { timeout: 45000 }); // 45s — allows for Render free-tier cold start
         } catch (aiError) {
             console.error(`[CHAT] AI service failed:`, aiError.response?.data?.detail || aiError.message);
             return res.status(502).json({
