@@ -45,6 +45,19 @@ const corsOptions = {
 app.use(express.json());
 app.use(cookieParser());
 
+// Root health check — must come before all route groups
+app.get('/', (req, res) => {
+    res.status(200).json({
+        status: 'operational',
+        service: 'BeeBot API',
+        version: '1.0.0',
+        message: 'BeeBot backend is live and running.',
+        timestamp: new Date().toISOString(),
+        docs: 'https://beebot-ai.vercel.app/docs',
+        uptime: process.uptime()
+    });
+});
+
 // Auth
 app.use('/api/auth', cors(corsOptions), authRoutes);
 
