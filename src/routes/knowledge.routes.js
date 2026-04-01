@@ -36,7 +36,7 @@ async function embedText(knowledgeId, businessId, sourceId, text, source) {
             text,
             source,
             source_id: sourceId,
-        });
+        }, { timeout: 60000 });
 
         // We DO NOT mark it as 'done' here anymore. 
         // Python Celery worker is handling it asynchronously.
@@ -58,7 +58,7 @@ async function embedUrl(knowledgeId, businessId, sourceId, url) {
             business_id: businessId.toString(),
             url,
             source_id: sourceId,
-        });
+        }, { timeout: 60000 });
 
         // Do not mark 'done' - Celery handles it.
         // We can optionally update the content string though.
@@ -86,7 +86,7 @@ async function embedFile(knowledgeId, businessId, sourceId, fileBuffer, filename
         const result = await axios.post(
             `${config.PYTHON_SERVICE_URL}/api/knowledge/upload-file`,
             form,
-            { headers: form.getHeaders() }
+            { headers: form.getHeaders(), timeout: 60000 }
         );
 
         // Do not mark 'done'. Celery worker handles it.
