@@ -129,6 +129,7 @@ router.post('/', async (req, res) => {
         // Get chatbot config
         const chatbot = await Chatbot.findOne({ businessId: business._id });
         const botConfig = chatbot ? {
+            bot_name:         chatbot.bot_name,
             company_name:     business.business_name,
             tone:             chatbot.bot_tone,
             welcome_message:  chatbot.welcome_message,
