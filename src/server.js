@@ -1,6 +1,6 @@
+import './env.js';  // must be first — loads dotenv before any module reads process.env
 import express    from 'express';
 import cors       from 'cors';
-import dotenv     from 'dotenv';
 import mongoose   from 'mongoose';
 import cookieParser from 'cookie-parser';
 import rateLimit  from 'express-rate-limit';
@@ -20,8 +20,6 @@ import webhookRoutes      from './routes/webhook.routes.js';
 // Legacy
 import clientRoutes       from './routes/client.routes.js';
 import paymentRoutes      from './routes/payment.routes.js';
-
-dotenv.config();
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
