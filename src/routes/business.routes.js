@@ -23,6 +23,9 @@ router.post('/', protect, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Business profile already exists', business: existing });
         }
 
+        const trialStartDate = new Date();
+        const trialEndDate   = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
         const business = await Business.create({
             userId: req.user._id,
             business_name,
@@ -30,7 +33,11 @@ router.post('/', protect, async (req, res) => {
             business_type,
             support_email,
             timezone,
-            primary_language
+            primary_language,
+            trialStartDate,
+            trialEndDate,
+            isTrialActive:      true,
+            subscriptionStatus: 'trial',
         });
 
         // Auto-generate API key for this business

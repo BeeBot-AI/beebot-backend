@@ -8,6 +8,7 @@ const chatbotSchema = new mongoose.Schema({
     fallback_message: { type: String, default: "I'm sorry, I don't have that information. Please contact support." },
     primary_color: { type: String, default: '#000000', match: /^#[0-9A-Fa-f]{6}$/ },
     conversation_starters: { type: [String], default: [] },
+    logoUrl:    { type: String, default: null }, // Cloudinary CDN URL
     created_at: { type: Date, default: Date.now }
 });
 

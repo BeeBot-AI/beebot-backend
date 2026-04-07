@@ -1,42 +1,49 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
+
+/**
+ * protect — verifies the short-lived access token sent as a Bearer token.
+ *
+ * Token sources (in priority order):
+ *   1. Authorization: Bearer <accessToken>   ← primary (in-memory on client)
+ *   2. jwt cookie                            ← legacy fallback for older sessions
+ */
 export const protect = async (req, res, next) => {
     let token;
 
-    // Check for token in cookies first, then Authorization header
-    if (req.cookies && req.cookies.jwt) {
-        token = req.cookies.jwt;
-    } else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+    if (req.headers.authorization?.startsWith('Bearer ')) {
         token = req.headers.authorization.split(' ')[1];
+    } else if (req.cookies?.jwt) {
+        // Legacy: old sessions still carry the jwt cookie (30d token).
+        // Accept it so existing users aren't immediately logged out.
+        token = req.cookies.jwt;
     }
 
     if (!token || token === 'none') {
-        return res.status(401).json({ success: false, message: 'Not authorized to access this route' });
+        return res.status(401).json({ success: false, message: 'Not authorized' });
     }
 
     try {
-        const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
-        const decoded = jwt.verify(token, jwtSecret);
-
+        const decoded = jwt.verify(token, JWT_SECRET);
         req.user = await User.findById(decoded.userId).select('-password');
-
         if (!req.user) {
             return res.status(401).json({ success: false, message: 'User not found' });
         }
-
         next();
-    } catch (error) {
-        console.error('Auth middleware error:', error.message);
-        return res.status(401).json({ success: false, message: 'Token is invalid or expired' });
+    } catch (err) {
+        // Expired access token → client should call /api/auth/refresh
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ success: false, message: 'Access token expired', code: 'TOKEN_EXPIRED' });
+        }
+        return res.status(401).json({ success: false, message: 'Token invalid' });
     }
 };
 
-export const authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            return res.status(403).json({ success: false, message: `User role ${req.user ? req.user.role : 'unknown'} is not authorized to access this route` });
-        }
-        next();
-    };
+export const authorize = (...roles) => (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+        return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    next();
 };
