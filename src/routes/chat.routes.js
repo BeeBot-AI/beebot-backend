@@ -92,18 +92,22 @@ router.post('/', async (req, res) => {
 
         let business;
 
-        // Try internal JWT session (Playground tab)
-        if (req.cookies && req.cookies.jwt) {
+        // Try Bearer token auth (Playground / dashboard — access token sent via Authorization header)
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith('Bearer ')) {
             try {
                 const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
-                const decoded = jwt.verify(req.cookies.jwt, jwtSecret);
+                const decoded = jwt.verify(authHeader.split(' ')[1], jwtSecret);
                 business = await Business.findOne({ userId: decoded.userId });
             } catch (err) {
-                console.error('[CHAT] JWT verification failed:', err.message);
+                if (err.name === 'TokenExpiredError') {
+                    return res.status(401).json({ code: 'TOKEN_EXPIRED', error: 'Access token expired' });
+                }
+                console.error('[CHAT] Bearer token verification failed:', err.message);
             }
         }
 
-        // Fallback: API key auth
+        // Fallback: API key auth (widget embed)
         if (!business) {
             const apiKeyRecord = await ApiKey.findOne({ api_key: apiKey }).populate('businessId');
             if (!apiKey || !apiKeyRecord) {
