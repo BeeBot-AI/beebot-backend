@@ -3,6 +3,7 @@ import Conversation from '../models/Conversation.js';
 import Message from '../models/Message.js';
 import Business from '../models/Business.js';
 import { protect } from '../middleware/auth.middleware.js';
+import { getIO } from '../socket.js';
 
 const router = Router();
 
@@ -53,6 +54,7 @@ router.get('/:id/messages', protect, async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
+
 // @desc    Toggle Human Takeover
 // @route   PUT /api/conversations/:id/takeover
 // @access  Private
@@ -62,10 +64,39 @@ router.put('/:id/takeover', protect, async (req, res) => {
         if (!conv) return res.status(404).json({ success: false, message: 'Not found' });
 
         conv.human_takeover = !conv.human_takeover;
-        if (conv.human_takeover) conv.status = 'needs_human';
-        else conv.status = 'active';
+
+        if (conv.human_takeover) {
+            // Agent claimed the conversation
+            conv.status = 'human_active';
+        } else {
+            // Agent released — return to AI
+            conv.status = 'active';
+        }
 
         await conv.save();
+
+        // Real-time: notify widget + refresh dashboard list
+        const io = getIO();
+        if (io) {
+            const convId = conv._id.toString();
+            const bizId  = conv.businessId.toString();
+
+            if (conv.human_takeover) {
+                // Tell the widget visitor an agent has joined
+                io.to(`conv_${convId}`).emit('agent:joined', { conversationId: convId });
+            } else {
+                // Tell the widget visitor AI has resumed
+                io.to(`conv_${convId}`).emit('agent:ai_resumed', { conversationId: convId });
+            }
+
+            // Refresh conversation list for all agents in this business
+            io.to(`business_${bizId}`).emit('conversation:update', {
+                conversationId: convId,
+                status: conv.status,
+                human_takeover: conv.human_takeover,
+            });
+        }
+
         res.status(200).json({ success: true, conversation: conv });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -84,6 +115,24 @@ router.put('/:id/status', protect, async (req, res) => {
         if (conv.status === 'resolved') conv.human_takeover = false;
 
         await conv.save();
+
+        // Real-time: notify widget + refresh dashboard list
+        const io = getIO();
+        if (io) {
+            const convId = conv._id.toString();
+            const bizId  = conv.businessId.toString();
+
+            if (conv.status === 'resolved') {
+                io.to(`conv_${convId}`).emit('conversation:resolved', { conversationId: convId });
+            }
+
+            io.to(`business_${bizId}`).emit('conversation:update', {
+                conversationId: convId,
+                status: conv.status,
+                human_takeover: conv.human_takeover,
+            });
+        }
+
         res.status(200).json({ success: true, conversation: conv });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
@@ -104,11 +153,25 @@ router.post('/:id/reply', protect, async (req, res) => {
             content
         });
 
+        // Real-time: push agent message to widget immediately
+        const io = getIO();
+        if (io) {
+            io.to(`conv_${req.params.id}`).emit('agent:message', {
+                message: {
+                    _id: message._id,
+                    role: 'agent',
+                    content,
+                    timestamp: message.timestamp,
+                },
+            });
+        }
+
         res.status(201).json({ success: true, message });
     } catch (error) {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 });
+
 // @desc    Get dashboard stats
 // @route   GET /api/conversations/stats
 // @access  Private
