@@ -1,9 +1,16 @@
 import './env.js';  // must be first — loads dotenv before any module reads process.env
+import { createServer }  from 'http';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import express    from 'express';
 import cors       from 'cors';
 import mongoose   from 'mongoose';
 import cookieParser from 'cookie-parser';
 import rateLimit  from 'express-rate-limit';
+import { initSocket } from './socket.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
 
 import authRoutes         from './routes/auth.routes.js';
 import businessRoutes     from './routes/business.routes.js';
@@ -21,8 +28,9 @@ import webhookRoutes      from './routes/webhook.routes.js';
 import clientRoutes       from './routes/client.routes.js';
 import paymentRoutes      from './routes/payment.routes.js';
 
-const app  = express();
-const PORT = process.env.PORT || 5000;
+const app        = express();
+const httpServer = createServer(app);
+const PORT       = process.env.PORT || 5000;
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -45,6 +53,9 @@ app.use('/api/webhooks', webhookRoutes);
 // ── Standard middleware ────────────────────────────────────────────────
 app.use(express.json());
 app.use(cookieParser());
+
+// ── Static uploads (images sent via widget) ────────────────────────────
+app.use('/uploads', express.static(join(__dirname, '../../uploads')));
 
 // ── Health check ───────────────────────────────────────────────────────
 app.get('/', (_req, res) => {
@@ -104,4 +115,8 @@ if (process.env.MONGO_URI) {
         .catch(err => console.error('[DB] Connection error:', err));
 }
 
-app.listen(PORT, () => console.log(`[Server] Running on port ${PORT}`));
+// ── Socket.io ──────────────────────────────────────────────────────────
+initSocket(httpServer);
+
+// ── Start ──────────────────────────────────────────────────────────────
+httpServer.listen(PORT, () => console.log(`[Server] Running on port ${PORT}`));
